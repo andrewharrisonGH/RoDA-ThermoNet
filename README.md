@@ -1,2 +1,2 @@
-# RoDA-TN
+# RoDA-ThermoNet
 MC-SCIBIF Research Project Repository
