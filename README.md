@@ -4,6 +4,13 @@ ThermoNet is a computational tool for predicting protein thermostability change 
 
 Here we detail instructions on how to execute the developed workflow to expand training datasets for ThermoNet. Key optimisations have been made from legacy code to improve space and time costs in generating tensors for training and prediction.
 
+## Contents
+1. [Installation](#installation)
+2. [Use RoDA-ThermoNet](#use-roda-thermonet)
+3. [Example](#example)
+    - [Training](#training)
+    - [Testing](#testing)
+
 ## Installation
 
 First, setup the environment with required software.
@@ -193,4 +200,4 @@ and
 ```bash
 for i in `seq 1 10`; do python predict.py -x ssym_tensors_rev.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_rev_i180_pred_${i}.txt; done
 ```
-9. Average the predictions across the ensemble members for both direct and reverse final predictions ΔΔG (adjusted sign to convention if necessary) and compare with the generated targets in `ssym_tensors_dir_ddg.txt` and `Q1744_tensors_rev_ddg.txt`.
+9. Average the predictions across the ensemble members for both direct and reverse final predictions ΔΔG (adjusted sign to convention if necessary) and compare with the generated targets in `ssym_tensors_dir_ddg.txt` and `ssym_tensors_rev_ddg.txt`.
