@@ -134,7 +134,7 @@ def main() -> None:
                                     args.voxelsize, args.verbose, args.reverse)
     
     # Decide dataset name
-    dset_name = "rev" if args.reverse else "fwd"
+    dset_name = "rev" if args.reverse else "dir"
     npy_path = args.output + f"_{dset_name}.npy"
     txt_path = args.output + f"_{dset_name}_ddg.txt"
 

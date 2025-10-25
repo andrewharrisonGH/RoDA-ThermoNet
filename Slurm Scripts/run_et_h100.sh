@@ -43,7 +43,9 @@ if [ "x$SLURM_JOB_ID" == "x" ]; then
 fi
 
 # The modules to load:
-module load foss/2022a TensorFlow/2.15.1-CUDA-12.2.0-Python-3.11.3
+module load Anaconda3/2024.02-1
+eval "$(conda shell.bash hook)"
+conda activate thermonet
 
 # Run the job from the directory where it was launched (default)
 
