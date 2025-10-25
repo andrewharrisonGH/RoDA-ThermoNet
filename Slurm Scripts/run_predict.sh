@@ -45,7 +45,7 @@ conda activate thermonet
 # Run the job from the directory where it was launched (default)
 
 # The job command(s):
-for i in `seq 1 10`; do python predict.py -x ssym_tensors_fwd.npy -m ./models_60/${j}_i60TN_member_${i}.h5 -o Ssym_${j}_i60TN_predictions_${i}.txt; done
+for i in `seq 1 10`; do python predict.py -x ssym_tensors_dir.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_dir_i180_pred_${i}.txt; done
 
 
 ##DO NOT ADD/EDIT BEYOND THIS LINE##

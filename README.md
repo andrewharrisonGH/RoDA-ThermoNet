@@ -1,6 +1,7 @@
 # RoDA-ThermoNet
 An end-to-end workflow as part of a MC-SCIBIF Research Project to apply rotational data augmentation (RoDA) to [ThermoNet](https://github.com/gersteinlab/ThermoNet) (Li et al., 2020).
-ThermoNet is a computational tool for predicting protein thermostability change (ΔΔG) due to missense mutations. Its ensemble 3D-CNN architecture learns from voxelised PDB environments, and has shown promise in accurate prediction from solely structure-derived features. RoDA for ThermoNet seeks to expand trainable instances by rotating PDB structures, and preserving the scarce experimental stability data. 
+ThermoNet is a computational tool for predicting protein thermostability change (ΔΔG) due to missense mutations. Its ensemble 3D-CNN architecture learns from voxelised PDB environments, and has shown promise in accurate prediction from solely structure-derived features. RoDA for ThermoNet seeks to expand the number of trainable tensors by rotating PDB structures, and preserving the scarce experimental stability data labels. 
+
 Here we detail instructions on how to execute the developed workflow to expand training datasets for ThermoNet. Key optimisations have been made from legacy code to improve space and time costs in generating tensors for training and prediction.
 
 ## Installation
@@ -14,7 +15,7 @@ git clone https://github.com/andrewharrisonGH/RoDA-ThermoNet.git
 ```
 
 ### Requirements
-ThermoNet was built for Linux platforms, thus, RoDA-ThermoNet has only been tested on Linux platforms. To use ThermoNet, you would need to install the following third-party software:
+ThermoNet was built for Linux platforms, thus, RoDA-ThermoNet has only been tested on Linux platforms. To use RoDA-ThermoNet, you will need to install the following third-party software:
   * Rosetta 3.10. Rosetta is a multi-purpose macromolecular modeling suite that is used in ThermoNet for creating and refining protein structures. You can get Rosetta from the Rosetta Commons website: https://www.rosettacommons.org/software
 1. Go to https://els2.comotion.uw.edu/product/rosetta to get an academic license for Rosetta.
 2. Download Rosetta 3.10 (source + binaries for Linux) from this site: https://www.rosettacommons.org/software/license-and-download
@@ -29,8 +30,8 @@ The above commands will create a conda environment and install all dependencies 
 
 ## Use RoDA-ThermoNet
 Note: this workflow is optimised for use on a HPC cluster using Slurm Workload Manager.
-The whole of RoDA-ThermoNet input begins with two CSV files: VARIANT_LIST CSV (e.g. `Q1744_direct.csv`), and a ROTATIONS_LSIT CSV (e.g. `rotations.csv`).
-Ensure variant CSV is formatted with `pdb_id,pos,wild_type,mutant,ddg` and rotations CSV with `x_rot,y_rot,z_rot`, example files are found in this repo.
+The whole of RoDA-ThermoNet input begins with two CSV files: VARIANT_LIST CSV (e.g. `Q1744_direct.csv`), and a ROTATIONS_LIST CSV (e.g. `rotations.csv`).
+Ensure VARIANT_LIST is formatted with `pdb_id,pos,wild_type,mutant,ddg` and ROTATION_LIST with `x_rot,y_rot,z_rot`, example files are found in this repo.
 
 ### Get PDBs
 Run the following command to download and clean each unique wild-type PDB for your dataset, depositing all downloaded selected PDB chains into `PDBs/`
@@ -52,7 +53,7 @@ python split_variants --input_csv VARIANT_LIST --output_dir ./Variants
 ```
 
 ### Generate individual job submission commands
-Run the following commands to submit separate Slurm jobs for relaxation and mutation with `da_workflow.sh` (insert preffered partition, project ID, and path/to/relax.static.linuxgccrelease binary)
+Run the following commands to submit separate Slurm jobs for generating relaxed and mutated structures with `da_workflow.sh` (insert preffered partition, project ID, and path/to/relax.static.linuxgccrelease binary), depositing into individualised pdb_id subfolders under `./PDB_relaxed`.
 ```bash
 mkdir log
 for i in ./PDBs/*.pdb; do 
@@ -61,7 +62,7 @@ echo "sbatch -o log/${filename}.out -e log/${filename}.err da_workflow.sh $filen
 done > run_rdawf_slurm.sh
 cat run_rdawf_slurm.sh | bash
 ```
-Noting `da_workflow` calls the ThermoNet ROSETTA relax protocol
+Noting `da_workflow` calls the ThermoNet Rosetta relax protocol
 ```bash
 path/to/relax.static.linuxgccrelease -in:file:s "$INPUT_PDB" -relax:constrain_relax_to_start_coords -out:suffix _relaxed -out:no_nstruct_label -relax:ramp_constraints false -out:path:all "$OUT_DIR"
 ```
@@ -71,7 +72,7 @@ python ./rosetta_relax.py --rosetta-bin path/to/relax.static.linuxgccrelease -l 
 ```
 
 ### Rotation and Tensor Generation
-Run the following commands, with an appropriate number of allocated CPU resources (I have preffered `n=32`), to generate direct and reverse tensors from the relaxed PDB structure that undergo the rotational augmentations specified in ROTATIONS (example separate slurm submission scripts can be found in this Repo). If you are generating testing tensors, have only one rotation listed in ROTATIONS_LIST as `0,0,0`.
+Run the following commands, with an appropriate number of allocated CPU resources (I have preffered `n=32`), to generate direct and reverse tensors from the relaxed PDB structures that undergo the rotational augmentations specified in ROTATIONS (example separate slurm submission scripts can be found in this Repo as `run_gends` and `run_gends_rev.sh`). If you are generating testing tensors, have only one rotation listed in ROTATIONS_LIST as `0,0,0`.
 ```bash
 python gends.py --input VARIANT_LIST --output output_tensor_name --pdb_dir ./PDB_relaxed  --rotations ROTATION_LIST --boxsize 16 --voxelsize 1 --ncores 32
 python gends.py --input VARIANT_LIST --output output_tensor_name --pdb_dir ./PDB_relaxed  --rotations ROTATION_LIST --boxsize 16 --voxelsize 1 --ncores 32 --reverse
@@ -97,4 +98,99 @@ Run the following command, to predict on direct (or reverse, change `dir` to `re
 for i in `seq 1 10`; do python predict.py -x output_tensor_name_dir.npy -m RoDAThermoNet_ensemble_member_${i}.h5 -o output_tensor_name_dir_predictions_${i}.txt; done
 ```
 
-Now take the average across members for final ensemble ΔΔG predictions, and compare to target ΔΔG values on your own analysis software of choice.
+Now take the average across members for final ensemble ΔΔG predictions, and compare to target ΔΔG values on your own analysis software of choice (noting some datasets may have differing ΔΔG sign conventions, such as the original Q1744 having stabilising ΔΔG < 0, and S669 and Ssym having stabilising ΔΔG > 0, so adjust final sign to align accordingly)
+
+##  Example
+Here we outline execution of RoDA as incremental rotations of 180 degrees around the x and y-axis of PDB structures, to train a new ThermoNet-style ensemble, and predict on Ssym
+
+### Training
+1. Move `Q1744_direct.csv` into the main folder and call `get_pdbs.py` to retrieve required PDBs
+```bash
+python get_pdbs.py --csv_file Q1744_direct.csv
+```
+2. Conduct sanity check to affirm PDB and listed variant allignment
+```bash
+python sanity_check.py Q1744_direct.csv
+```
+3. Create split variant lists for each unique PDB in `Q1744_direct.csv`
+```bash
+mkdir Variants
+python split_variants --input_csv Q1744_direct.csv --output_dir ./Variants
+```
+4. Move to main folder and adjust `da_workflow.sh` job commands to correct Rosetta binary paths to then run relax and mutate Rosetta protocols for each unique PDB and their separated variants with
+```bash
+mkdir log
+for i in ./PDBs/*.pdb; do 
+filename=$(basename "$i" .pdb) 
+echo "sbatch -o log/${filename}.out -e log/${filename}.err da_workflow.sh $filename" 
+done > run_rdawf_slurm.sh
+cat run_rdawf_slurm.sh | bash
+```
+5. List the desired incremental rotations to applied in `rotations.csv`
+```
+x_rot,y_rot,z_rot
+0,0,0
+180,0,0
+0,180,0
+180,180,0
+```
+6. Move into the main folder and adjust `run_gends.sh` to have the job command
+```
+python gends.py --input Q1744_direct.csv --output Q1744_tensorsi180 --pdb_dir ./PDB_relaxed  --rotations rotations.csv --boxsize 16 --voxelsize 1 --ncores 32
+```
+7. Submit `sbatch run_gends.sh` to generate augmented direct tensors and target values; add the `--reverse` flag to the `run_gends.sh` job command and resubmit to generate augmented reverse tensors and target values.
+8. Move to the main folder and adjust the job commands of `run_et_h100.sh` to
+```
+srun python train_ensemble.py \
+    --direct_features Q1744_tensors_dir.npy \
+    --inverse_features Q1744_tensors_rev.npy \
+    --direct_targets Q1744_tensors_dir_ddg.txt \
+    --inverse_targets Q1744_tensors_rev_ddg.txt \
+    --epochs 200 \
+    --prefix i180_RoDAThermoNet \
+    --member $MEMBER_IDX \
+    --k 10
+```
+9. Submit `sbatch run_et_h100.sh` on appropriate GPU partition to train new ensemble members
+
+### Testing
+1. Remove all PDBs currently populating `./PDBs` directory
+2. Move `ssym_ref.csv` into the main folder and call `get_pdbs.py` to retrieve required PDBs
+```bash
+python get_pdbs.py --csv_file ssym_ref.csv
+```
+3. Conduct sanity check to affirm PDB and listed variant allignment
+```bash
+python sanity_check.py ssym_ref.csv
+```
+4. Create split variant lists for each unique PDB in `ssym_ref.csv`
+```bash
+python split_variants --input_csv ssym_ref.csv --output_dir ./Variants
+```
+4. Run relax and mutate Rosetta protocols for each unique PDB and their separated variants with
+```bash
+for i in ./PDBs/*.pdb; do 
+filename=$(basename "$i" .pdb) 
+echo "sbatch -o log/${filename}.out -e log/${filename}.err da_workflow.sh $filename" 
+done > run_rdawf_slurm.sh
+cat run_rdawf_slurm.sh | bash
+```
+5. List the desired incremental rotations to applied in `rotations.csv`
+```
+x_rot,y_rot,z_rot
+0,0,0
+```
+6. Adjust `run_gends.sh` to have the job command
+```
+python gends.py --input ssym_ref.csv --output ssym_tensors --pdb_dir ./PDB_relaxed  --rotations rotations.csv --boxsize 16 --voxelsize 1 --ncores 32
+```
+7. Submit `sbatch run_gends.sh` to generate augmented direct tensors and target values; add the `--reverse` flag to the `run_gends.sh` job command and resubmit to generate augmented reverse tensors and target values.
+8. Run predictions on direct and reverse tensors for each RoDA-ThermoNet ensemble member
+```bash
+for i in `seq 1 10`; do python predict.py -x ssym_tensors_dir.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_dir_i180_pred_${i}.txt; done
+```
+and
+```bash
+for i in `seq 1 10`; do python predict.py -x ssym_tensors_rev.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_rev_i180_pred_${i}.txt; done
+```
+9. Average the predictions across the ensemble members for both direct and reverse final predictions ΔΔG (adjusted sign to convention if necessary) and compare with the generated targets in `ssym_tensors_dir_ddg.txt` and `Q1744_tensors_rev_ddg.txt`.
