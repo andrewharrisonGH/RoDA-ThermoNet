@@ -7,20 +7,20 @@ Here we detail instructions on how to execute the developed workflow to expand t
 
 First, setup the environment with required software.
 
-# Clone RoDA-ThermoNet
+### Clone RoDA-ThermoNet
 Clone RoDA-ThermoNet locally.
 ```bash
 git clone https://github.com/andrewharrisonGH/RoDA-ThermoNet.git
 ```
 
-# Requirements
+### Requirements
 ThermoNet was built for Linux platforms, thus, RoDA-ThermoNet has only been tested on Linux platforms. To use ThermoNet, you would need to install the following third-party software:
   * Rosetta 3.10. Rosetta is a multi-purpose macromolecular modeling suite that is used in ThermoNet for creating and refining protein structures. You can get Rosetta from the Rosetta Commons website: https://www.rosettacommons.org/software
 1. Go to https://els2.comotion.uw.edu/product/rosetta to get an academic license for Rosetta.
 2. Download Rosetta 3.10 (source + binaries for Linux) from this site: https://www.rosettacommons.org/software/license-and-download
 3. Extract the tarball to a local directory from which Rosetta binaries can be called by specifying their full path.
 
-# Conda environment
+### Conda environment
 ```bash
 conda env create --name thermonet --file environment.yaml
 conda activate thermonet
@@ -32,26 +32,26 @@ Note: this workflow is optimised for use on a HPC cluster using Slurm Workload M
 The whole of RoDA-ThermoNet input begins with two CSV files: VARIANT_LIST CSV (e.g. `Q1744_direct.csv`), and a ROTATIONS_LSIT CSV (e.g. `rotations.csv`).
 Ensure variant CSV is formatted with `pdb_id,pos,wild_type,mutant,ddg` and rotations CSV with `x_rot,y_rot,z_rot`, example files are found in this repo.
 
-# Get PDBs
+### Get PDBs
 Run the following command to download and clean each unique wild-type PDB for your dataset, depositing all downloaded selected PDB chains into `PDBs/`
 ```bash
 python get_pdbs.py --csv_file VARIANT_LIST
 ```
 
-# Sanity check dataset with PDBs
+### Sanity check dataset with PDBs
 Before moving onto relaxation ensure wild-type residue and positions for each PDB align with VARIANT_LIST by running.
 ```bash
 python sanity_check.py VARIANT_LIST
 ```
 
-# Split variants for parallel relaxation
+### Split variants for parallel relaxation
 Run the following commands to generate separate CSVs for each unique PDB which will be passed into individual Slurm submission relaxation and mutation jobs.
 ```bash
 mkdir Variants
 python split_variants --input_csv VARIANT_LIST --output_dir ./Variants
 ```
 
-# Generate individual job submission commands
+### Generate individual job submission commands
 Run the following commands to submit separate Slurm jobs for relaxation and mutation with `da_workflow.sh` (insert preffered partition, project ID, and path/to/relax.static.linuxgccrelease binary)
 ```bash
 mkdir log
@@ -70,14 +70,14 @@ and mutation protocol
 python ./rosetta_relax.py --rosetta-bin path/to/relax.static.linuxgccrelease -l "$VARIANT_LIST" --base-dir ./PDB_relaxed
 ```
 
-# Rotation and Tensor Generation
+### Rotation and Tensor Generation
 Run the following commands, with an appropriate number of allocated CPU resources (I have preffered `n=32`), to generate direct and reverse tensors from the relaxed PDB structure that undergo the rotational augmentations specified in ROTATIONS (example separate slurm submission scripts can be found in this Repo). If you are generating testing tensors, have only one rotation listed in ROTATIONS_LIST as `0,0,0`.
 ```bash
 python gends.py --input VARIANT_LIST --output output_tensor_name --pdb_dir ./PDB_relaxed  --rotations ROTATION_LIST --boxsize 16 --voxelsize 1 --ncores 32
 python gends.py --input VARIANT_LIST --output output_tensor_name --pdb_dir ./PDB_relaxed  --rotations ROTATION_LIST --boxsize 16 --voxelsize 1 --ncores 32 --reverse
 ```
 
-# Train new ThermoNet ensemble
+### Train new ThermoNet ensemble
 Run the following commands, if you wish to train a new ThermoNet ensemble with the generated tensors, otherwise move to prediction with an already trained ensemble. Note this step is best submitted as Slurm array as exampled in `run_et_h100.sh`, running on a GPU partition such as `gpu-h100`.
 ```bash
 python train_ensemble.py \
@@ -91,7 +91,7 @@ python train_ensemble.py \
     --k 10
 ```
 
-# Predict
+### Predict
 Run the following command, to predict on direct (or reverse, change `dir` to `rev`) generated tensors for each ensemble member.
 ```bash
 for i in `seq 1 10`; do python predict.py -x output_tensor_name_dir.npy -m RoDAThermoNet_ensemble_member_${i}.h5 -o output_tensor_name_dir_predictions_${i}.txt; done
