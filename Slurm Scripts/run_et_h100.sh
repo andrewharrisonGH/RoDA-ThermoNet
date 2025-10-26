@@ -18,7 +18,7 @@
 #SBATCH --cpus-per-task=8
 
 # The amount of memory in megabytes per node:
-#SBATCH --mem=65536
+#SBATCH --mem=32768
 
 # Use this email address:
 #SBATCH --mail-user=
@@ -54,10 +54,10 @@ conda activate thermonet
 MEMBER_IDX=$SLURM_ARRAY_TASK_ID
 
 srun python train_ensemble.py \
-    --direct_features Q1744_tensors_dir.npy \
-    --inverse_features Q1744_tensors_rev.npy \
-    --direct_targets Q1744_tensors_dir_ddg.txt \
-    --inverse_targets Q1744_tensors_rev_ddg.txt \
+    --direct_features Q1744_tensorsi180_dir.npy \
+    --inverse_features Q1744_tensorsi180_rev.npy \
+    --direct_targets Q1744_tensorsi180_dir_ddg.txt \
+    --inverse_targets Q1744_tensorsi180_rev_ddg.txt \
     --epochs 200 \
     --prefix 0TN \
     --member $MEMBER_IDX \

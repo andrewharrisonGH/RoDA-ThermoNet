@@ -56,7 +56,7 @@ python sanity_check.py VARIANT_LIST
 Run the following commands to generate separate CSVs for each unique PDB which will be passed into individual Slurm submission relaxation and mutation jobs.
 ```bash
 mkdir Variants
-python split_variants --input_csv VARIANT_LIST --output_dir ./Variants
+python split_variants.py --input_csv VARIANT_LIST --output_dir ./Variants
 ```
 
 ### Generate individual job submission commands
@@ -122,9 +122,9 @@ python sanity_check.py Q1744_direct.csv
 3. Create split variant lists for each unique PDB in `Q1744_direct.csv`
 ```bash
 mkdir Variants
-python split_variants --input_csv Q1744_direct.csv --output_dir ./Variants
+python split_variants.py --input_csv Q1744_direct.csv --output_dir ./Variants
 ```
-4. Move to main folder and adjust `da_workflow.sh` job commands to correct Rosetta binary paths to then run relax and mutate Rosetta protocols for each unique PDB and their separated variants with
+4. Adjust `da_workflow.sh` and job commands to correct Rosetta binary paths, and move the script to the main folder; to then run relax and mutate Rosetta protocols for each unique PDB and their separated variants with
 ```bash
 mkdir log
 for i in ./PDBs/*.pdb; do 
@@ -149,10 +149,10 @@ python gends.py --input Q1744_direct.csv --output Q1744_tensorsi180 --pdb_dir ./
 8. Move to the main folder and adjust the job commands of `run_et_h100.sh` to
 ```
 srun python train_ensemble.py \
-    --direct_features Q1744_tensors_dir.npy \
-    --inverse_features Q1744_tensors_rev.npy \
-    --direct_targets Q1744_tensors_dir_ddg.txt \
-    --inverse_targets Q1744_tensors_rev_ddg.txt \
+    --direct_features Q1744_tensorsi180_dir.npy \
+    --inverse_features Q1744_tensorsi180_rev.npy \
+    --direct_targets Q1744_tensorsi180_dir_ddg.txt \
+    --inverse_targets Q1744_tensorsi180_rev_ddg.txt \
     --epochs 200 \
     --prefix i180_RoDAThermoNet \
     --member $MEMBER_IDX \
@@ -172,7 +172,7 @@ python sanity_check.py ssym_ref.csv
 ```
 4. Create split variant lists for each unique PDB in `ssym_ref.csv`
 ```bash
-python split_variants --input_csv ssym_ref.csv --output_dir ./Variants
+python split_variants.py --input_csv ssym_ref.csv --output_dir ./Variants
 ```
 4. Run relax and mutate Rosetta protocols for each unique PDB and their separated variants with
 ```bash
@@ -182,7 +182,7 @@ echo "sbatch -o log/${filename}.out -e log/${filename}.err da_workflow.sh $filen
 done > run_rdawf_slurm.sh
 cat run_rdawf_slurm.sh | bash
 ```
-5. List the desired incremental rotations to applied in `rotations.csv`
+5. List the desired rotations to be applied in `rotations.csv`
 ```
 x_rot,y_rot,z_rot
 0,0,0
