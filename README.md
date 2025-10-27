@@ -48,7 +48,7 @@ RoDA-ThermoNet
 ├── sanity_check.py                 # Fetched PDBs align w/ dataset script
 ├── split_variants.py               # Separate dataset by unique PDB script
 └── train_ensemble.py               # 3D-CNN model trainer script
-
+```
 
 ## Installation
 
