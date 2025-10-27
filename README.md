@@ -11,6 +11,45 @@ Here we detail instructions on how to execute the developed workflow to expand t
     - [Training](#training)
     - [Testing](#testing)
 
+## Project Structure
+
+Below is an overview of the repository structure and purpose of each main component.
+
+```plaintext
+RoDA-ThermoNet
+|
+├── Datasets/                       # Formatted datasets for RoDA-ThermoNet
+|   ├── Q1744_direct.csv            # Original training dataset for ThermoNet
+|   ├── s669_ref.csv                # Common benchmarking dataset across literature
+|   └── ssym_ref.csv                # Original testing dataset for ThermoNet
+|
+├── Models/                         # Previously Trained Models
+|   ├── models_0/                   # 10 "No Augmentation" ThermoNet Ensembles
+|   ├── models_60/                  # 10 incremental 60° (x,y) RoDa-ThermoNet Ensembles
+|   ├── models_72/                  # 10 incremental 72° (x,y) RoDa-ThermoNet Ensembles
+|   ├── models_90/                  # 10 incremental 90° (x,y) RoDa-ThermoNet Ensembles
+|   ├── models_120/                 # 10 incremental 120° (x,y) RoDa-ThermoNet Ensembles
+|   ├── models_180/                 # 10 incremental 180° (x,y) RoDa-ThermoNet Ensembles
+|   └── ThermoNet_Model/            # Original ThermoNet Ensemble
+|
+├── Slurm Scripts/                  # Example Slurm Script for job Submission
+|
+├── utils/                          # Utility scripts for ThermoNet
+|
+├── amino_acids.py                  # Utility script for clean_pdb.py
+├── clean_pdb.py                    # PDB pre-processing script for Rosetta
+├── environment.yaml                # Conda environment settings
+├── gends.py                        # Rotated Tensor generation script
+├── get_pdbs.py                     # Fetch and clean dataset PDBs script
+├── LICENSE                         # License information
+├── predict.py                      # Legacy predict on model script
+├── rosetta_relax.py                # Legacy variant PDB creator script
+├── rotations.csv                   # Applied rotations list
+├── sanity_check.py                 # Fetched PDBs align w/ dataset script
+├── split_variants.py               # Separate dataset by unique PDB script
+└── train_ensemble.py               # 3D-CNN model trainer script
+
+
 ## Installation
 
 First, setup the environment with required software.
@@ -30,10 +69,14 @@ ThermoNet was built for Linux platforms, thus, RoDA-ThermoNet has only been test
 
 ### Conda environment
 ```bash
-conda env create --name thermonet --file environment.yaml
+conda env create --name thermonet --file environment.yml
 conda activate thermonet
 ```
-The above commands will create a conda environment and install all dependencies for RoDa-ThermoNet tensor creation, model training and ΔΔG prediction. Change `prefix: /your/path/.conda/envs/thermonet` in environment.yaml to your conda environment path (e.g. `/home/user/.conda/envs/thermonet`)
+The above commands will create a conda environment and install all dependencies for RoDa-ThermoNet tensor creation, model training (CPU-only) and ΔΔG prediction. For GPU-enabled model training and prediction, your HPC system may already have an available environment module (e.g. `load module TensorFlow/2.15.1-CUDA-12.2.0-Python-3.11.3`) ensure that it has:
+- tensorflow==2.15.1
+- keras==2.15.0
+- cudatoolkit==12.2
+- cudnn==8.9
 
 ## Use RoDA-ThermoNet
 Note: this workflow is optimised for use on a HPC cluster using Slurm Workload Manager.
@@ -69,7 +112,7 @@ echo "sbatch -o log/${filename}.out -e log/${filename}.err da_workflow.sh $filen
 done > run_rdawf_slurm.sh
 cat run_rdawf_slurm.sh | bash
 ```
-Noting `da_workflow` calls the ThermoNet Rosetta relax protocol
+Noting `da_workflow` calls the legacy Rosetta relax protocol
 ```bash
 path/to/relax.static.linuxgccrelease -in:file:s "$INPUT_PDB" -relax:constrain_relax_to_start_coords -out:suffix _relaxed -out:no_nstruct_label -relax:ramp_constraints false -out:path:all "$OUT_DIR"
 ```
@@ -86,7 +129,7 @@ python gends.py --input VARIANT_LIST --output output_tensor_name --pdb_dir ./PDB
 ```
 
 ### Train new ThermoNet ensemble
-Run the following commands, if you wish to train a new ThermoNet ensemble with the generated tensors, otherwise move to prediction with an already trained ensemble. Note this step is best submitted as Slurm array as exampled in `run_et_h100.sh`, running on a GPU partition such as `gpu-h100`.
+Run the following command for $MEMBER_IDX 1..10, if you wish to train a new ThermoNet ensemble with the generated tensors, otherwise move to prediction with an already trained ensemble. Note this step is best submitted as a Slurm array as exampled in `run_et_h100.sh`, running on a GPU partition such as `gpu-h100` with the valid environment as specified above.
 ```bash
 python train_ensemble.py \
     --direct_features output_tensor_name_dir.npy \
@@ -158,10 +201,13 @@ srun python train_ensemble.py \
     --member $MEMBER_IDX \
     --k 10
 ```
-9. Submit `sbatch run_et_h100.sh` on appropriate GPU partition to train new ensemble members
+9. Submit `sbatch run_et_h100.sh` on appropriate (CPU/GPU) partition and environment to train new ensemble members
 
 ### Testing
 1. Remove all PDBs currently populating `./PDBs` directory
+```bash
+rm -r ./PDBs
+```
 2. Move `ssym_ref.csv` into the main folder and call `get_pdbs.py` to retrieve required PDBs
 ```bash
 python get_pdbs.py --csv_file ssym_ref.csv
@@ -195,9 +241,10 @@ python gends.py --input ssym_ref.csv --output ssym_tensors --pdb_dir ./PDB_relax
 8. Run predictions on direct and reverse tensors for each RoDA-ThermoNet ensemble member
 ```bash
 for i in `seq 1 10`; do python predict.py -x ssym_tensors_dir.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_dir_i180_pred_${i}.txt; done
-```
-and
-```bash
 for i in `seq 1 10`; do python predict.py -x ssym_tensors_rev.npy -m i180_RoDAThermoNet_member_${i}.h5 -o ssym_rev_i180_pred_${i}.txt; done
 ```
-9. Average the predictions across the ensemble members for both direct and reverse final predictions ΔΔG (adjusted sign to convention if necessary) and compare with the generated targets in `ssym_tensors_dir_ddg.txt` and `ssym_tensors_rev_ddg.txt`.
+9. Average the predictions across the ensemble members for both direct and reverse final predictions ΔΔG (adjusted sign to convention if necessary) and compare with the generated targets in `ssym_tensors_dir_ddg.txt` and `ssym_tensors_rev_ddg.txt`. Example linux command to average each line across each file for dir and rev:
+```bash
+paste ssym_dir_i180_pred_{1..10}.txt | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum/NF}' > final_dir_pred.txt
+paste ssym_rev_i180_pred_{1..10}.txt | awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum/NF}' > final_rev_pred.txt
+```

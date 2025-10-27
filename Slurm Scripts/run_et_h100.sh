@@ -46,6 +46,7 @@ fi
 module load Anaconda3/2024.02-1
 eval "$(conda shell.bash hook)"
 conda activate thermonet
+# Or for GPU-enabled (dependent on system): module load foss/2022a TensorFlow/2.15.1-CUDA-12.2.0-Python-3.11.3
 
 # Run the job from the directory where it was launched (default)
 

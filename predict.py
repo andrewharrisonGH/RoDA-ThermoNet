@@ -35,11 +35,11 @@ def main():
 
     # load training set
     features = np.load(args.features)
-    features = np.moveaxis(features, 1, -1)
+    # features = np.moveaxis(features, 1, -1)
     # features = features.reshape((args.number, 14, 16, 16, 16))
 
     # load trained model
-    model = load_model(args.model)
+    model = load_model(args.model, compile=False) # Legacy loading fix
     
     # save predictions
     y_pred = model.predict(features)
